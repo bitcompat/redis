@@ -12,9 +12,9 @@ jobs:
       name: main
       image_tag: |
         latest
-        7.0.4-bullseye-r1 # renovate: datasource=github-releases depName=redis/redis
-        7.0.4-bullseye # renovate: datasource=github-releases depName=redis/redis
-        7.0.4 # renovate: datasource=github-releases depName=redis/redis
+        7.0.4.4-bullseye-r1 # renovate: datasource=github-releases depName=redis/redis
+        7.0.4.4-bullseye # renovate: datasource=github-releases depName=redis/redis
+        7.0.4.4 # renovate: datasource=github-releases depName=redis/redis
         7.0
         7
     secrets: inherit
