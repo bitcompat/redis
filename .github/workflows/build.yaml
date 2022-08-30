@@ -1,0 +1,33 @@
+name: build
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build_redis_7:
+    uses: bitcompat/base/.github/workflows/build.yaml@main
+    with:
+      name: main
+      image_tag: |
+        latest
+        7.0.4-bullseye-r1 # renovate: datasource=github-releases depName=redis/redis
+        7.0.4-bullseye # renovate: datasource=github-releases depName=redis/redis
+        7.0.4 # renovate: datasource=github-releases depName=redis/redis
+        7.0
+        7
+    secrets: inherit
+  build_redis_6:
+    uses: bitcompat/base/.github/workflows/build.yaml@main
+    with:
+      name: main
+      build-args: |
+        REDIS_VERSION=6.2.7
+      image_tag: |
+        6.2.7-bullseye-r1
+        6.2.7-bullseye
+        6.2.7
+        7.0
+        7
+    secrets: inherit
