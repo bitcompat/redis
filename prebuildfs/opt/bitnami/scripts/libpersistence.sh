@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Bitnami persistence library
+# Bitcompat persistence library
 # Used for bringing persistence capabilities to applications that don't have clear separation of data and logic
 
 # shellcheck disable=SC1091

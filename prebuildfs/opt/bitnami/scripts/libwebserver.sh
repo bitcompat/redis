@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Bitnami web server handler library
+# Bitcompat web server handler library
 
 # shellcheck disable=SC1090,SC1091
 

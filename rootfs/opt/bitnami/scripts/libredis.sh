@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Bitnami Redis library
+# Bitcompat Redis library
 
 # shellcheck disable=SC1091
 

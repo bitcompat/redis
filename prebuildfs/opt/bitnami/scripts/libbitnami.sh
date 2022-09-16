@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Bitnami custom library
+# Bitcompat custom library
 
 # shellcheck disable=SC1091
 
@@ -31,7 +31,7 @@ print_welcome_page() {
 }
 
 ########################
-# Print the welcome page for a Bitnami Docker image
+# Print the welcome page for a Bitcompat Docker image
 # Globals:
 #   BITNAMI_APP_NAME
 # Arguments:
@@ -40,10 +40,10 @@ print_welcome_page() {
 #   None
 #########################
 print_image_welcome_page() {
-    local github_url="https://github.com/bitnami/containers"
+    local github_url="https://github.com/bitcompat/redis"
 
     log ""
-    log "${BOLD}Welcome to the Bitnami ${BITNAMI_APP_NAME} container${RESET}"
+    log "${BOLD}Welcome to the Bitcompat ${BITNAMI_APP_NAME} container${RESET}"
     log "Subscribe to project updates by watching ${BOLD}${github_url}${RESET}"
     log "Submit issues and feature requests at ${BOLD}${github_url}/issues${RESET}"
     log ""
