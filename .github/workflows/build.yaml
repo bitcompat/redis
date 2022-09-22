@@ -10,6 +10,9 @@ jobs:
     uses: bitcompat/base/.github/workflows/build.yaml@main
     with:
       name: main
+      build-args: |
+        REDIS_VERSION=7.0.5
+      cache-scope: redis-7-0
       image_tag: |
         latest
         7.0.5-bullseye-r1 # renovate: datasource=github-releases depName=redis/redis
@@ -24,6 +27,7 @@ jobs:
       name: main
       build-args: |
         REDIS_VERSION=6.2.7
+      cache-scope: redis-6-2
       image_tag: |
         6.2.7-bullseye-r1
         6.2.7-bullseye
