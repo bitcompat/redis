@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.4
 # renovate: datasource=github-releases depName=redis/redis
-ARG REDIS_VERSION=7.0.4
+ARG BUILD_VERSION=7.0.4
 
 FROM docker.io/bitnami/minideb:bullseye as stage-0
 
@@ -12,8 +12,8 @@ RUN mkdir -p /opt/src/redis /opt/bitnami/redis/etc /opt/bitnami/redis/licenses
 COPY --link --from=ghcr.io/bitcompat/gosu:1.14.0-bullseye-r1 /opt/bitnami/ /opt/bitnami/
 COPY --link --from=ghcr.io/bitcompat/wait-for-port:1.0.3-bullseye-r1 /opt/bitnami/ /opt/bitnami/
 
-ARG REDIS_VERSION
-ARG REDIS_DOWNLOAD_URL=http://download.redis.io/releases/redis-${REDIS_VERSION}.tar.gz
+ARG BUILD_VERSION
+ARG REDIS_DOWNLOAD_URL=http://download.redis.io/releases/redis-${BUILD_VERSION}.tar.gz
 ARG REDIS_BASEDIR=/opt/bitnami/redis
 
 ADD --link $REDIS_DOWNLOAD_URL /opt/src/redis.tar.gz
@@ -22,7 +22,7 @@ ADD --link https://raw.githubusercontent.com/redis/redis-hashes/master/README /o
 WORKDIR /opt/src
 RUN <<EOT /bin/bash
     set -eux
-	cat README.md | grep -F ${REDIS_VERSION} | grep sha256 | awk '{print \$4,"redis.tar.gz"}' | sha256sum -c -
+	cat README.md | grep -F ${BUILD_VERSION} | grep sha256 | awk '{print \$4,"redis.tar.gz"}' | sha256sum -c -
 	tar -xzf redis.tar.gz -C /opt/src/redis --strip-components=1
 
 # disable Redis protected mode [1] as it is unnecessary in context of Docker
@@ -56,7 +56,7 @@ RUN <<EOT /bin/bash
 	make -C /opt/src/redis install PREFIX=${REDIS_BASEDIR}
 
 	cp -f /opt/src/redis/redis.conf /opt/bitnami/redis/etc/redis-default.conf
-	cp -f /opt/src/redis/COPYING /opt/bitnami/redis/licenses/redis-${REDIS_VERSION}.txt
+	cp -f /opt/src/redis/COPYING /opt/bitnami/redis/licenses/redis-${BUILD_VERSION}.txt
 	rm -r /opt/src/redis
 
     PATH=${REDIS_BASEDIR}/bin:\$PATH
@@ -79,7 +79,7 @@ EOT
 
 FROM docker.io/bitnami/minideb:bullseye AS stage-1
 
-ARG REDIS_VERSION
+ARG BUILD_VERSION
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 LABEL org.opencontainers.image.ref.name="${SERVER_VERSION}-debian-11-r0" \
       org.opencontainers.image.version="${SERVER_VERSION}"
@@ -97,7 +97,7 @@ ENV HOME="/" \
     OS_ARCH="$TARGETPLATFORM" \
     OS_FLAVOUR="debian-11" \
     OS_NAME="linux" \
-    APP_VERSION="${REDIS_VERSION}" \
+    APP_VERSION="${BUILD_VERSION}" \
     BITNAMI_APP_NAME="redis" \
     PATH="/opt/bitnami/common/bin:/opt/bitnami/redis/bin:$PATH"
 
