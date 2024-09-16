@@ -9,7 +9,7 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN install_packages acl ca-certificates curl gzip libbz2-1.0 libc6-dev libssl-dev make tar procps zlib1g bzip2 build-essential g++ pkg-config libssh2-1-dev libldap2-dev
 RUN mkdir -p /opt/src/redis /opt/bitnami/redis/etc /opt/bitnami/redis/licenses
 
-COPY --link --from=ghcr.io/bitcompat/gosu:1.14.0-bullseye-r1 /opt/bitnami/ /opt/bitnami/
+COPY --link --from=ghcr.io/bitcompat/gosu:1.16.0-bullseye-r1 /opt/bitnami/ /opt/bitnami/
 COPY --link --from=ghcr.io/bitcompat/wait-for-port:1.0.3-bullseye-r1 /opt/bitnami/ /opt/bitnami/
 
 ARG BUILD_VERSION
