@@ -10,7 +10,7 @@ RUN install_packages acl ca-certificates curl gzip libbz2-1.0 libc6-dev libssl-d
 RUN mkdir -p /opt/src/redis /opt/bitnami/redis/etc /opt/bitnami/redis/licenses
 
 COPY --link --from=ghcr.io/bitcompat/gosu:1.14.0-bullseye-r1 /opt/bitnami/ /opt/bitnami/
-COPY --link --from=ghcr.io/bitcompat/wait-for-port:1.0.3-bullseye-r1 /opt/bitnami/ /opt/bitnami/
+COPY --link --from=ghcr.io/bitcompat/wait-for-port:1.0.6-bullseye-r1 /opt/bitnami/ /opt/bitnami/
 
 ARG BUILD_VERSION
 ARG REDIS_DOWNLOAD_URL=http://download.redis.io/releases/redis-${BUILD_VERSION}.tar.gz
