@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.17
 # renovate: datasource=github-releases depName=redis/redis
-ARG BUILD_VERSION=7.0.4
+ARG BUILD_VERSION=7.4.5
 
 FROM docker.io/bitnami/minideb:bullseye as stage-0
 
@@ -56,7 +56,7 @@ RUN <<EOT /bin/bash
 	make -C /opt/src/redis install PREFIX=${REDIS_BASEDIR}
 
 	cp -f /opt/src/redis/redis.conf /opt/bitnami/redis/etc/redis-default.conf
-	cp -f /opt/src/redis/COPYING /opt/bitnami/redis/licenses/redis-${BUILD_VERSION}.txt
+	cp -f /opt/src/redis/LICENSE.txt /opt/bitnami/redis/licenses/redis-${BUILD_VERSION}.txt
 	rm -r /opt/src/redis
 
     PATH=${REDIS_BASEDIR}/bin:\$PATH
