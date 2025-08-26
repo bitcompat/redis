@@ -6,21 +6,21 @@ on:
       - main
 
 jobs:
+  build_redis_7_4:
+    uses: bitcompat/base/.github/workflows/build.yaml@main
+    with:
+      name: main
+      cache-scope: redis-7-4
+      version: 7.4.5 # renovate: datasource=github-releases depName=redis/redis
+      major_only_tag: true
+      latest: true
+    secrets: inherit
   build_redis_7_2:
     uses: bitcompat/base/.github/workflows/build.yaml@main
     with:
       name: main
       cache-scope: redis-7-2
-      version: 7.2.4 # renovate: datasource=github-releases depName=redis/redis
-      major_only_tag: true
-      latest: true
-    secrets: inherit
-  build_redis_7_0:
-    uses: bitcompat/base/.github/workflows/build.yaml@main
-    with:
-      name: main
-      cache-scope: redis-7-0
-      version: 7.0.15 # renovate: datasource=github-releases depName=redis/redis
+      version: 7.2.10 # renovate: datasource=github-releases depName=redis/redis
       major_only_tag: false
     secrets: inherit
   build_redis_6:
@@ -29,5 +29,5 @@ jobs:
       name: main
       cache-scope: redis-6-2
       major_only_tag: true
-      version: 6.2.14
+      version: 6.2.19
     secrets: inherit
