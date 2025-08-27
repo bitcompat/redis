@@ -112,7 +112,11 @@ is_web_server_running() {
 #########################
 web_server_start() {
     info "Starting $(web_server_type) in background"
-    "${BITNAMI_ROOT_DIR}/scripts/$(web_server_type)/start.sh"
+    if [[ "${BITNAMI_SERVICE_MANAGER:-}" = "systemd" ]]; then
+        systemctl start "bitnami.$(web_server_type).service"
+    else
+        "${BITNAMI_ROOT_DIR}/scripts/$(web_server_type)/start.sh"
+    fi
 }
 
 ########################
@@ -126,34 +130,11 @@ web_server_start() {
 #########################
 web_server_stop() {
     info "Stopping $(web_server_type)"
-    "${BITNAMI_ROOT_DIR}/scripts/$(web_server_type)/stop.sh"
-}
-
-########################
-# Restart web server
-# Globals:
-#   *
-# Arguments:
-#   None
-# Returns:
-#   None
-#########################
-web_server_restart() {
-    info "Restarting $(web_server_type)"
-    "${BITNAMI_ROOT_DIR}/scripts/$(web_server_type)/restart.sh"
-}
-
-########################
-# Reload web server
-# Globals:
-#   *
-# Arguments:
-#   None
-# Returns:
-#   None
-#########################
-web_server_reload() {
-    "${BITNAMI_ROOT_DIR}/scripts/$(web_server_type)/reload.sh"
+    if [[ "${BITNAMI_SERVICE_MANAGER:-}" = "systemd" ]]; then
+        systemctl stop "bitnami.$(web_server_type).service"
+    else
+        "${BITNAMI_ROOT_DIR}/scripts/$(web_server_type)/stop.sh"
+    fi
 }
 
 ########################
@@ -410,49 +391,4 @@ web_server_update_app_configuration() {
     for web_server in "${web_servers[@]}"; do
         web_server_execute "$web_server" "${web_server}_update_app_configuration" "${args[@]}"
     done
-}
-
-########################
-# Enable loading page, which shows users that the initialization process is not yet completed
-# Globals:
-#   *
-# Arguments:
-#   None
-# Returns:
-#   None
-#########################
-web_server_enable_loading_page() {
-    ensure_web_server_app_configuration_exists "__loading" --hosts "_default_" \
-        --apache-additional-configuration "
-# Show a HTTP 503 Service Unavailable page by default
-RedirectMatch 503 ^/$
-# Show index.html if server is answering with 404 Not Found or 503 Service Unavailable status codes
-ErrorDocument 404 /index.html
-ErrorDocument 503 /index.html" \
-        --nginx-additional-configuration "
-# Show a HTTP 503 Service Unavailable page by default
-location / {
-  return 503;
-}
-# Show index.html if server is answering with 404 Not Found or 503 Service Unavailable status codes
-error_page 404 @installing;
-error_page 503 @installing;
-location @installing {
-  rewrite ^(.*)$ /index.html break;
-}"
-    web_server_reload
-}
-
-########################
-# Enable loading page, which shows users that the initialization process is not yet completed
-# Globals:
-#   *
-# Arguments:
-#   None
-# Returns:
-#   None
-#########################
-web_server_disable_install_page() {
-    ensure_web_server_app_configuration_not_exists "__loading"
-    web_server_reload
 }

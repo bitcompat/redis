@@ -6,6 +6,7 @@
 
 # Load Generic Libraries
 . /opt/bitnami/scripts/liblog.sh
+. /opt/bitnami/scripts/libvalidations.sh
 
 # Functions
 
@@ -66,7 +67,12 @@ get_machine_ip() {
         error "Could not find any IP address associated to hostname ${hostname}"
         exit 1
     fi
-    echo "${ip_addresses[0]}"
+    # Check if the first IP address is IPv6 to add brackets
+    if validate_ipv6 "${ip_addresses[0]}" ; then
+        echo "[${ip_addresses[0]}]"
+    else
+        echo "${ip_addresses[0]}"
+    fi
 }
 
 ########################

@@ -1,5 +1,4 @@
 #!/bin/bash
-#
 # Bitcompat Redis library
 
 # shellcheck disable=SC1091
@@ -54,7 +53,12 @@ redis_conf_set() {
     value="${value//[$'\t\n\r']}"
     [[ "$value" = "" ]] && value="\"$value\""
 
-    replace_in_file "${REDIS_BASE_DIR}/etc/redis.conf" "^#*\s*${key} .*" "${key} ${value}" false
+    # Determine whether to enable the configuration for RDB persistence, if yes, do not enable the replacement operation
+    if [ "${key}" == "save" ]; then
+        echo "${key} ${value}" >> "${REDIS_BASE_DIR}/etc/redis.conf"
+    else
+        replace_in_file "${REDIS_BASE_DIR}/etc/redis.conf" "^#*\s*${key} .*" "${key} ${value}" false
+    fi
 }
 
 ########################
@@ -154,7 +158,7 @@ redis_stop() {
 
     debug "Stopping Redis"
     if am_i_root; then
-        gosu "$REDIS_DAEMON_USER" "${REDIS_BASE_DIR}/bin/redis-cli" "${args[@]}" shutdown
+        run_as_user "$REDIS_DAEMON_USER" "${REDIS_BASE_DIR}/bin/redis-cli" "${args[@]}" shutdown
     else
         "${REDIS_BASE_DIR}/bin/redis-cli" "${args[@]}" shutdown
     fi
@@ -206,9 +210,9 @@ redis_validate() {
         fi
     fi
     if is_boolean_yes "$REDIS_TLS_ENABLED"; then
-        if [[ "$REDIS_PORT_NUMBER" == "$REDIS_TLS_PORT" ]] && [[ "$REDIS_PORT_NUMBER" != "6379" ]]; then
+        if [[ "$REDIS_PORT_NUMBER" == "$REDIS_TLS_PORT_NUMBER" ]] && [[ "$REDIS_PORT_NUMBER" != "6379" ]]; then
             # If both ports are assigned the same numbers and they are different to the default settings
-            print_validation_error "Environment variables REDIS_PORT_NUMBER and REDIS_TLS_PORT point to the same port number (${REDIS_PORT_NUMBER}). Change one of them or disable non-TLS traffic by setting REDIS_PORT_NUMBER=0"
+            print_validation_error "Environment variables REDIS_PORT_NUMBER and REDIS_TLS_PORT_NUMBER point to the same port number (${REDIS_PORT_NUMBER}). Change one of them or disable non-TLS traffic by setting REDIS_PORT_NUMBER=0"
         fi
         if [[ -z "$REDIS_TLS_CERT_FILE" ]]; then
             print_validation_error "You must provide a X.509 certificate in order to use TLS"
@@ -220,11 +224,12 @@ redis_validate() {
         elif [[ ! -f "$REDIS_TLS_KEY_FILE" ]]; then
             print_validation_error "The private key file in the specified path ${REDIS_TLS_KEY_FILE} does not exist"
         fi
-        if [[ -n "$REDIS_TLS_KEY_FILE_PASS" ]] && [[ ! -f "$REDIS_TLS_KEY_FILE_PASS" ]]; then
-            print_validation_error "The passphrase for the private key file in the specified path ${REDIS_TLS_KEY_FILE_PASS} does not exist"
-        fi
         if [[ -z "$REDIS_TLS_CA_FILE" ]]; then
-            print_validation_error "You must provide a CA X.509 certificate in order to use TLS"
+            if [[ -z "$REDIS_TLS_CA_DIR" ]]; then
+                print_validation_error "You must provide either a CA X.509 certificate or a CA certificates directory in order to use TLS"
+            elif [[ ! -d "$REDIS_TLS_CA_DIR" ]]; then
+                print_validation_error "The CA certificates directory specified by path ${REDIS_TLS_CA_DIR} does not exist"
+            fi
         elif [[ ! -f "$REDIS_TLS_CA_FILE" ]]; then
             print_validation_error "The CA X.509 certificate file in the specified path ${REDIS_TLS_CA_FILE} does not exist"
         fi
@@ -261,18 +266,18 @@ redis_configure_replication() {
     elif [[ "$REDIS_REPLICATION_MODE" =~ ^(slave|replica)$ ]]; then
         if [[ -n "$REDIS_SENTINEL_HOST" ]]; then
             local -a sentinel_info_command=("redis-cli" "-h" "${REDIS_SENTINEL_HOST}" "-p" "${REDIS_SENTINEL_PORT_NUMBER}")
-            is_boolean_yes "$REDIS_TLS_ENABLED" && sentinel_info_command+=("--tls" "--cert" "${REDIS_TLS_CERT_FILE}" "--key" "${REDIS_TLS_KEY_FILE}" "--cacert" "${REDIS_TLS_CA_FILE}")
+            is_boolean_yes "$REDIS_TLS_ENABLED" && sentinel_info_command+=("--tls" "--cert" "${REDIS_TLS_CERT_FILE}" "--key" "${REDIS_TLS_KEY_FILE}")
+            # shellcheck disable=SC2015
+            is_empty_value "$REDIS_TLS_CA_FILE" && sentinel_info_command+=("--cacertdir" "${REDIS_TLS_CA_DIR}") || sentinel_info_command+=("--cacert" "${REDIS_TLS_CA_FILE}")
             sentinel_info_command+=("sentinel" "get-master-addr-by-name" "${REDIS_SENTINEL_MASTER_NAME}")
-            read -r -a REDIS_SENTINEL_INFO <<< "$("${sentinel_info_command[@]}")"
+            read -r -a REDIS_SENTINEL_INFO <<< "$("${sentinel_info_command[@]}" | tr '\n' ' ')"
             REDIS_MASTER_HOST=${REDIS_SENTINEL_INFO[0]}
             REDIS_MASTER_PORT_NUMBER=${REDIS_SENTINEL_INFO[1]}
         fi
         wait-for-port --host "$REDIS_MASTER_HOST" "$REDIS_MASTER_PORT_NUMBER"
         [[ -n "$REDIS_MASTER_PASSWORD" ]] && redis_conf_set masterauth "$REDIS_MASTER_PASSWORD"
-        # Starting with Redis 5, use 'replicaof' instead of 'slaveof'. Maintaining both for backward compatibility
-        local parameter="replicaof"
-        [[ $(redis_major_version) -lt 5 ]] && parameter="slaveof"
-        redis_conf_set "$parameter" "$REDIS_MASTER_HOST $REDIS_MASTER_PORT_NUMBER"
+        # Use 'replicaof' (Redis 5+)
+        redis_conf_set "replicaof" "$REDIS_MASTER_HOST $REDIS_MASTER_PORT_NUMBER"
     fi
 }
 
@@ -361,6 +366,9 @@ redis_initialize() {
 #########################
 redis_append_include_conf() {
     if [[ -f "$REDIS_OVERRIDES_FILE" ]]; then
+        # Remove all include statements including commented ones
+        redis_conf_set include "$REDIS_OVERRIDES_FILE"
+        redis_conf_unset "include"
         echo "include $REDIS_OVERRIDES_FILE" >> "${REDIS_BASE_DIR}/etc/redis.conf"
     fi
 }
@@ -399,20 +407,33 @@ redis_configure_default() {
         # Enable AOF https://redis.io/topics/persistence#append-only-file
         # Leave default fsync (every second)
         redis_conf_set appendonly "${REDIS_AOF_ENABLED}"
+
+        #The value stored in $i here is the number of seconds and times of save rules in redis rdb mode
+        if is_empty_value "$REDIS_RDB_POLICY"; then
+            if is_boolean_yes "$REDIS_RDB_POLICY_DISABLED"; then
+                redis_conf_set save ""
+            fi
+        else
+            for i in ${REDIS_RDB_POLICY}; do
+                redis_conf_set save "${i//#/ }"
+            done
+        fi
+
         redis_conf_set port "$REDIS_PORT_NUMBER"
         # TLS configuration
         if is_boolean_yes "$REDIS_TLS_ENABLED"; then
-            if [[ "$REDIS_PORT_NUMBER" ==  "6379" ]] && [[ "$REDIS_TLS_PORT" ==  "6379" ]]; then
+            if [[ "$REDIS_PORT_NUMBER" ==  "6379" ]] && [[ "$REDIS_TLS_PORT_NUMBER" ==  "6379" ]]; then
                 # If both ports are set to default values, enable TLS traffic only
                 redis_conf_set port 0
-                redis_conf_set tls-port "$REDIS_TLS_PORT"
+                redis_conf_set tls-port "$REDIS_TLS_PORT_NUMBER"
             else
                 # Different ports were specified
-                redis_conf_set tls-port "$REDIS_TLS_PORT"
+                redis_conf_set tls-port "$REDIS_TLS_PORT_NUMBER"
             fi
             redis_conf_set tls-cert-file "$REDIS_TLS_CERT_FILE"
             redis_conf_set tls-key-file "$REDIS_TLS_KEY_FILE"
-            redis_conf_set tls-ca-cert-file "$REDIS_TLS_CA_FILE"
+            # shellcheck disable=SC2015
+            is_empty_value "$REDIS_TLS_CA_FILE" && redis_conf_set tls-ca-cert-dir "$REDIS_TLS_CA_DIR" || redis_conf_set tls-ca-cert-file "$REDIS_TLS_CA_FILE"
             ! is_empty_value "$REDIS_TLS_KEY_FILE_PASS" && redis_conf_set tls-key-file-pass "$REDIS_TLS_KEY_FILE_PASS"
             [[ -n "$REDIS_TLS_DH_PARAMS_FILE" ]] && redis_conf_set tls-dh-params-file "$REDIS_TLS_DH_PARAMS_FILE"
             redis_conf_set tls-auth-clients "$REDIS_TLS_AUTH_CLIENTS"

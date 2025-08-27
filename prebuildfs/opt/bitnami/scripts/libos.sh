@@ -197,6 +197,8 @@ am_i_root() {
 #   --version - Distro version
 #   --branch - Distro branch
 #   --codename - Distro codename
+#   --name - Distro name
+#   --pretty-name - Distro pretty name
 # Returns:
 #   String
 #########################
@@ -222,6 +224,12 @@ get_os_metadata() {
         ;;
     --codename)
         get_os_release_metadata VERSION_CODENAME
+        ;;
+    --name)
+        get_os_release_metadata NAME
+        ;;
+    --pretty-name)
+        get_os_release_metadata PRETTY_NAME
         ;;
     *)
         error "Unknown flag ${flag_name}"
@@ -404,11 +412,16 @@ generate_random_string() {
     ascii)
         filter="[:print:]"
         ;;
+    numeric)
+        filter="0-9"
+        ;;
     alphanumeric)
         filter="a-zA-Z0-9"
         ;;
-    numeric)
-        filter="0-9"
+    alphanumeric+special|special+alphanumeric)
+        # Limit variety of special characters, so there is a higher chance of containing more alphanumeric characters
+        # Special characters are harder to write, and it could impact the overall UX if most passwords are too complex
+        filter='a-zA-Z0-9:@.,/+!='
         ;;
     *)
         echo "Invalid type ${type}" >&2
@@ -463,4 +476,180 @@ convert_to_hex() {
         char=${str:iterator:1}
         printf '%x' "'${char}"
     done
+}
+
+########################
+# Get boot time
+# Globals:
+#   None
+# Arguments:
+#   None
+# Returns:
+#   Boot time metadata
+#########################
+get_boot_time() {
+    stat /proc --format=%Y
+}
+
+########################
+# Get machine ID
+# Globals:
+#   None
+# Arguments:
+#   None
+# Returns:
+#   Machine ID
+#########################
+get_machine_id() {
+    local machine_id
+    if [[ -f /etc/machine-id ]]; then
+        machine_id="$(cat /etc/machine-id)"
+    fi
+    if [[ -z "$machine_id" ]]; then
+        # Fallback to the boot-time, which will at least ensure a unique ID in the current session
+        machine_id="$(get_boot_time)"
+    fi
+    echo "$machine_id"
+}
+
+########################
+# Get the root partition's disk device ID (e.g. /dev/sda1)
+# Globals:
+#   None
+# Arguments:
+#   None
+# Returns:
+#   Root partition disk ID
+#########################
+get_disk_device_id() {
+    local device_id=""
+    if grep -q ^/dev /proc/mounts; then
+        device_id="$(grep ^/dev /proc/mounts | awk '$2 == "/" { print $1 }' | tail -1)"
+    fi
+    # If it could not be autodetected, fallback to /dev/sda1 as a default
+    if [[ -z "$device_id" || ! -b "$device_id" ]]; then
+        device_id="/dev/sda1"
+    fi
+    echo "$device_id"
+}
+
+########################
+# Get the root disk device ID (e.g. /dev/sda)
+# Globals:
+#   None
+# Arguments:
+#   None
+# Returns:
+#   Root disk ID
+#########################
+get_root_disk_device_id() {
+    get_disk_device_id | sed -E 's/p?[0-9]+$//'
+}
+
+########################
+# Get the root disk size in bytes
+# Globals:
+#   None
+# Arguments:
+#   None
+# Returns:
+#   Root disk size in bytes
+#########################
+get_root_disk_size() {
+    fdisk -l "$(get_root_disk_device_id)" | grep 'Disk.*bytes' | sed -E 's/.*, ([0-9]+) bytes,.*/\1/' || true
+}
+
+########################
+# Run command as a specific user and group (optional)
+# Arguments:
+#   $1 - USER(:GROUP) to switch to
+#   $2..$n - command to execute
+# Returns:
+#   Exit code of the specified command
+#########################
+run_as_user() {
+    run_chroot "$@"
+}
+
+########################
+# Execute command as a specific user and group (optional),
+# replacing the current process image
+# Arguments:
+#   $1 - USER(:GROUP) to switch to
+#   $2..$n - command to execute
+# Returns:
+#   Exit code of the specified command
+#########################
+exec_as_user() {
+    run_chroot --replace-process "$@"
+}
+
+########################
+# Run a command using chroot
+# Arguments:
+#   $1 - USER(:GROUP) to switch to
+#   $2..$n - command to execute
+# Flags:
+#   -r | --replace-process - Replace the current process image (optional)
+# Returns:
+#   Exit code of the specified command
+#########################
+run_chroot() {
+    local userspec
+    local user
+    local homedir
+    local replace=false
+    local -r cwd="$(pwd)"
+
+    # Parse and validate flags
+    while [[ "$#" -gt 0 ]]; do
+        case "$1" in
+            -r | --replace-process)
+                replace=true
+                ;;
+            --)
+                shift
+                break
+                ;;
+            -*)
+                stderr_print "unrecognized flag $1"
+                return 1
+                ;;
+            *)
+                break
+                ;;
+        esac
+        shift
+    done
+
+    # Parse and validate arguments
+    if [[ "$#" -lt 2 ]]; then
+        echo "expected at least 2 arguments"
+        return 1
+    else
+        userspec=$1
+        shift
+
+        # userspec can optionally include the group, so we parse the user
+        user=$(echo "$userspec" | cut -d':' -f1)
+    fi
+
+    if ! am_i_root; then
+        error "Could not switch to '${userspec}': Operation not permitted"
+        return 1
+    fi
+
+    # Get the HOME directory for the user to switch, as chroot does
+    # not properly update this env and some scripts rely on it
+    homedir=$(eval echo "~${user}")
+    if [[ ! -d $homedir ]]; then
+        homedir="${HOME:-/}"
+    fi
+
+    # Obtaining value for "$@" indirectly in order to properly support shell parameter expansion
+    if [[ "$replace" = true ]]; then
+        exec chroot --userspec="$userspec" / bash -c "cd ${cwd}; export HOME=${homedir}; exec \"\$@\"" -- "$@"
+    else
+        chroot --userspec="$userspec" / bash -c "cd ${cwd}; export HOME=${homedir}; exec \"\$@\"" -- "$@"
+    fi
 }

@@ -23,11 +23,3 @@ jobs:
       version: 8.0.3 # renovate: datasource=github-releases depName=redis/redis
       major_only_tag: false
     secrets: inherit
-  build_redis_7_4:
-    uses: bitcompat/base/.github/workflows/build.yaml@main
-    with:
-      name: main
-      cache-scope: redis-7-4
-      version: 7.4.5 # renovate: datasource=github-releases depName=redis/redis
-      major_only_tag: true
-    secrets: inherit
