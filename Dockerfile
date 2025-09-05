@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1.17
+# syntax=docker/dockerfile:1.18
 # renovate: datasource=github-releases depName=redis/redis
 ARG BUILD_VERSION=8.2.1
 
