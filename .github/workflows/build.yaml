@@ -10,6 +10,7 @@ jobs:
     uses: bitcompat/base/.github/workflows/build.yaml@main
     with:
       name: main
+      compatibility-service: redis
       cache-scope: redis-8-2
       version: 8.2.1 # renovate: datasource=github-releases depName=redis/redis
       major_only_tag: true
@@ -19,6 +20,7 @@ jobs:
     uses: bitcompat/base/.github/workflows/build.yaml@main
     with:
       name: main
+      compatibility-service: redis
       cache-scope: redis-8-0
       version: 8.0.3 # renovate: datasource=github-releases depName=redis/redis
       major_only_tag: false

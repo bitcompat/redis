@@ -2,6 +2,9 @@
 # renovate: datasource=github-releases depName=redis/redis
 ARG BUILD_VERSION=8.2.1
 
+# renovate: datasource=docker depName=anchore/syft
+FROM anchore/syft:v1.54.0@sha256:0356562f495d432056237fbea5cbc2d4839c9c75cd500784a66de2e7cc95ca7c AS sbom-generator
+
 FROM docker.io/bitnami/minideb:trixie as stage-0
 
 COPY prebuildfs /
@@ -110,7 +113,22 @@ RUN <<EOT /bin/bash
     ln -s /opt/bitnami/scripts/redis/run.sh /run.sh
     /opt/bitnami/scripts/redis/postunpack.sh
 
+    # Match Bitnami: runtime binaries must not retain setuid/setgid bits.
+    find / -xdev -type f -perm /6000 -exec chmod a-s {} +
+
     rm -rf /var/log/*
+EOT
+
+# Scan the installed artifacts; the scanner itself is not included in the image.
+RUN --mount=type=bind,from=sbom-generator,source=/syft,target=/usr/local/bin/syft --mount=type=tmpfs,target=/tmp/syft-home <<EOT /bin/bash
+    set -euo pipefail
+    export SYFT_CHECK_FOR_APP_UPDATE=false HOME=/tmp/syft-home XDG_CACHE_HOME=/tmp/syft-home/cache
+    syft scan dir:/opt/bitnami/redis --source-name bitcompat-redis --source-version "${BUILD_VERSION}" -o spdx-json=/opt/bitnami/redis/.spdx-redis.spdx
+    syft scan file:/opt/bitnami/common/bin/wait-for-port --source-name bitcompat-wait-for-port -o spdx-json=/opt/bitnami/common/.spdx-wait-for-port.spdx
+    chmod 664 /opt/bitnami/redis/.spdx-redis.spdx
+    chmod 644 /opt/bitnami/common/.spdx-wait-for-port.spdx
+    ln -s /opt/bitnami/redis/.spdx-redis.spdx /opt/bitnami/redis/.spdx-redis.json
+    ln -s /opt/bitnami/common/.spdx-wait-for-port.spdx /opt/bitnami/common/.spdx-wait-for-port.json
 EOT
 
 ENV HOME="/" \
