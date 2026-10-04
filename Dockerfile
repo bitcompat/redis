@@ -25,8 +25,8 @@ ADD --link https://raw.githubusercontent.com/redis/redis-hashes/master/README /o
 
 WORKDIR /opt/src
 RUN <<EOT /bin/bash
-    set -eux
-	cat README.md | grep -F ${BUILD_VERSION} | grep sha256 | awk '{print \$4,"redis.tar.gz"}' | sha256sum -c -
+    set -euxo pipefail
+	awk -v filename="redis-${BUILD_VERSION}.tar.gz" '\$1 == "hash" && \$2 == filename && \$3 == "sha256" {print \$4, "redis.tar.gz"; count++} END {if (count != 1) exit 1}' README.md | sha256sum -c -
 	tar -xzf redis.tar.gz -C /opt/src/redis --strip-components=1
 
 	sed -i -e "s/%VERSION%/${BUILD_VERSION}/" /opt/bitnami/.bitnami_components.json
