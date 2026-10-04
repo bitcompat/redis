@@ -2,7 +2,7 @@
 # renovate: datasource=github-releases depName=redis/redis
 ARG BUILD_VERSION=8.2.1
 
-FROM docker.io/bitnami/minideb:bookworm as stage-0
+FROM docker.io/bitnami/minideb:trixie as stage-0
 
 COPY prebuildfs /
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
@@ -10,7 +10,7 @@ RUN install_packages acl ca-certificates curl gzip libbz2-1.0 libc6-dev libssl-d
     build-essential g++ pkg-config git wget cmake python3 python3-pip libclang1 libclang-dev autoconf automake libtool
 RUN mkdir -p /opt/src/redis /opt/bitnami/redis/etc /opt/bitnami/redis/licenses
 
-COPY --link --from=ghcr.io/bitcompat/wait-for-port:1.0.10-bookworm-r1 /opt/bitnami/ /opt/bitnami/
+COPY --link --from=ghcr.io/bitcompat/wait-for-port:1.0.10-trixie /opt/bitnami/ /opt/bitnami/
 
 ARG BUILD_VERSION
 ARG REDIS_DOWNLOAD_URL=http://download.redis.io/releases/redis-${BUILD_VERSION}.tar.gz
@@ -92,19 +92,20 @@ RUN <<EOT bash
     strip --strip-all /opt/bitnami/common/bin/* || true
 EOT
 
-FROM docker.io/bitnami/minideb:bookworm AS stage-1
+FROM docker.io/bitnami/minideb:trixie AS stage-1
 
 ARG BUILD_VERSION
-ARG TARGETPLATFORM
+ARG TARGETARCH
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-LABEL org.opencontainers.image.ref.name="${BUILD_VERSION}-debian-12-r0" \
+LABEL org.opencontainers.image.ref.name="${BUILD_VERSION}-trixie" \
       org.opencontainers.image.version="${BUILD_VERSION}"
 
 COPY --from=stage-0 /opt/bitnami /opt/bitnami
 COPY --link rootfs /
 RUN <<EOT /bin/bash
     set -e
-    install_packages ca-certificates procps zlib1g tzdata libgnutls30 libgomp1 libssl3
+    install_packages ca-certificates procps zlib1g tzdata libgnutls30t64 libgomp1 libssl3t64
+    sed -i -e 's/"amd64"/"${TARGETARCH}"/g' /opt/bitnami/.bitnami_components.json
     ln -s /opt/bitnami/scripts/redis/entrypoint.sh /entrypoint.sh
     ln -s /opt/bitnami/scripts/redis/run.sh /run.sh
     /opt/bitnami/scripts/redis/postunpack.sh
@@ -113,8 +114,8 @@ RUN <<EOT /bin/bash
 EOT
 
 ENV HOME="/" \
-    OS_ARCH="$TARGETPLATFORM" \
-    OS_FLAVOUR="debian-12" \
+    OS_ARCH="$TARGETARCH" \
+    OS_FLAVOUR="debian-13" \
     OS_NAME="linux" \
     APP_VERSION="${BUILD_VERSION}" \
     BITNAMI_APP_NAME="redis" \
