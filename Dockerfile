@@ -131,7 +131,9 @@ RUN --mount=type=bind,from=sbom-generator,source=/syft,target=/usr/local/bin/syf
     ln -s /opt/bitnami/common/.spdx-wait-for-port.spdx /opt/bitnami/common/.spdx-wait-for-port.json
 EOT
 
+ARG IMAGE_REVISION=0
 ENV HOME="/" \
+    IMAGE_REVISION="$IMAGE_REVISION" \
     OS_ARCH="$TARGETARCH" \
     OS_FLAVOUR="debian-13" \
     OS_NAME="linux" \
