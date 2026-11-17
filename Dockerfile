@@ -3,7 +3,7 @@
 ARG BUILD_VERSION=8.2.1
 
 # renovate: datasource=docker depName=anchore/syft
-FROM anchore/syft:v1.55.0@sha256:4cc92b64ca74ffca4c94d4c8fcc01f217731375300be14d0b6eeb2e82eaa110a AS sbom-generator
+FROM anchore/syft:v1.57.2@sha256:e97e20b6e6d1699c60296b66ab337941724f9bd06ac279d893eda89601fc4b2a AS sbom-generator
 
 FROM docker.io/bitnami/minideb:trixie as stage-0
 
